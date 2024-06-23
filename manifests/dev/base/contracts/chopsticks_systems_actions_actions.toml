@@ -1,0 +1,10 @@
+kind = "DojoContract"
+class_hash = "0x6ab1bbb24f997d39ea8e17681f365de310dba43f090b0fee7ec5f3e00cc437c"
+original_class_hash = "0x6ab1bbb24f997d39ea8e17681f365de310dba43f090b0fee7ec5f3e00cc437c"
+base_class_hash = "0x0"
+abi = "manifests/dev/abis/base/contracts/chopsticks_systems_actions_actions.json"
+reads = []
+writes = []
+computed = []
+init_calldata = []
+name = "chopsticks::systems::actions::actions"

@@ -1,0 +1,20 @@
+kind = "DojoModel"
+class_hash = "0x34c8e55c20a220d31ff41db68b6112c4e115b7646a394e562566c5b2fa83f8c"
+original_class_hash = "0x34c8e55c20a220d31ff41db68b6112c4e115b7646a394e562566c5b2fa83f8c"
+abi = "manifests/dev/abis/base/models/chopsticks_models_game_player.json"
+name = "chopsticks::models::game::player"
+
+[[members]]
+name = "id"
+type = "ContractAddress"
+key = true
+
+[[members]]
+name = "left_hand"
+type = "u8"
+key = false
+
+[[members]]
+name = "right_hand"
+type = "u8"
+key = false

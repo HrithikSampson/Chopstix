@@ -1,0 +1,30 @@
+kind = "DojoModel"
+class_hash = "0x2241e21f3e51dc7e271a027bc26a9f438011fbe7a7713021d3d5f6358e5a81a"
+original_class_hash = "0x2241e21f3e51dc7e271a027bc26a9f438011fbe7a7713021d3d5f6358e5a81a"
+abi = "manifests/dev/abis/base/models/chopsticks_models_game_game.json"
+name = "chopsticks::models::game::game"
+
+[[members]]
+name = "session_id"
+type = "usize"
+key = true
+
+[[members]]
+name = "player1"
+type = "Player"
+key = false
+
+[[members]]
+name = "player2"
+type = "Option<Player>"
+key = false
+
+[[members]]
+name = "state"
+type = "GameState"
+key = false
+
+[[members]]
+name = "current_turn"
+type = "Turn"
+key = false

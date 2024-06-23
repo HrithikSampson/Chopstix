@@ -1,7 +1,7 @@
 
-use starknet::ContractAddress;*;
+use starknet::ContractAddress;
 
-#[derive(Clone, Copy, Drop, Serde)]
+#[derive(Copy, Drop, Serde)]
 #[dojo::model]
 struct Player {
     #[key]
@@ -10,26 +10,24 @@ struct Player {
     right_hand: u8,
 }
 
-#[derive(Clone, Copy, Drop, Serde)]
-#[dojo::model]
+#[derive(PartialEq, Copy ,Drop, Serde, Introspect)]
 enum GameState {
     WaitingForPlayer,
     InProgress,
-    Finished(ContractAddress), // Player ID of the winner
+    Finished: ContractAddress,
 }
 
-#[derive(Clone, Copy, Drop, Serde)]
-#[dojo::model]
+#[derive(PartialEq ,Copy ,Drop, Serde, Introspect)]
 enum Turn {
     Player1,
     Player2,
 }
 
-#[derive(Clone, Copy, Drop, Serde)]
+#[derive(Copy, Drop, Serde)]
 #[dojo::model]
 struct Game {
     #[key]
-    session_id: felt252,
+    session_id: usize,
     player1: Player,
     player2: Option<Player>,
     state: GameState,

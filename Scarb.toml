@@ -1,6 +1,6 @@
 [package]
 cairo-version = "2.6.3"
-name = "dojo_starter"
+name = "chopsticks"
 version = "0.7.0"
 
 [cairo]
