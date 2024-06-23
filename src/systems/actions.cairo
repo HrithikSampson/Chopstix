@@ -1,98 +1,125 @@
-use dojo_starter::models::moves::Direction;
-use dojo_starter::models::position::Position;
 
-// define the interface
-#[dojo::interface]
-trait IActions {
-    fn spawn(ref world: IWorldDispatcher);
-    fn move(ref world: IWorldDispatcher, direction: Direction);
-}
-
-// dojo decorator
 #[dojo::contract]
 mod actions {
-    use super::{IActions, next_position};
-    use starknet::{ContractAddress, get_caller_address};
-    use dojo_starter::models::{
-        position::{Position, Vec2}, moves::{Moves, Direction, DirectionsAvailable}
-    };
-
-    #[derive(Copy, Drop, Serde)]
-    #[dojo::model]
-    #[dojo::event]
-    struct Moved {
-        #[key]
-        player: ContractAddress,
-        direction: Direction,
+    
+    #[dojo::interface]
+    trait IActions {
+        fn start_game(ref world: IWorldDispatcher) -> felt252;
+        fn join_game(ref world: IWorldDispatcher, session_id: felt252);
+        fn make_move_opponent(ref world: IWorldDispatcher, session_id: felt252, hand: felt252, target_hand: felt252);
+        fn make_move_other_hand(ref world: IWorldDispatcher, session_id: felt252, current_hand: felt252, transfer: felt252);
     }
 
     #[abi(embed_v0)]
     impl ActionsImpl of IActions<ContractState> {
-        fn spawn(ref world: IWorldDispatcher) {
-            // Get the address of the current caller, possibly the player's address.
-            let player = get_caller_address();
-            // Retrieve the player's current position from the world.
-            let position = get!(world, player, (Position));
+        fn start_game(ref world: IWorldDispatcher) -> usize {
+            let caller = get_caller_address();
+            let session_id: felt252 = world.uuid();
+            let game = Game {
+                session_id,
+                player1: Player { id: caller, left_hand: 1, right_hand: 1 },
+                player2: None,
+                state: GameState::WaitingForPlayer,
+                current_turn: Turn::Player1,
+            };
+            set!(world,game);
+            world.emit(GameStarted { session_id });
+            session_id
+        }
 
-            // Update the world state with the new data.
-            // 1. Set the player's remaining moves to 100.
-            // 2. Move the player's position 10 units in both the x and y direction.
-            // 3. Set available directions to all four directions. (This is an example of how you can use an array in Dojo).
+        fn join_game(ref world: IWorldDispatcher, session_id: felt252) {
+            let caller = get_caller_address();
+            let mut game = get!(world,session_id,(Game));
+            if game.state != GameState::WaitingForPlayer {
+                panic("Game is not waiting for players");
+            }
+            game.player2 = Some(Player { id: caller, left_hand: 1, right_hand: 1 });
+            game.state = GameState::InProgress;
+            set!(world,game);
+            world.emit(PlayerJoined { session_id, player_id: caller });
+        }
 
-            let directions_available = DirectionsAvailable {
-                player,
-                directions: array![
-                    Direction::Up, Direction::Right, Direction::Down, Direction::Left
-                ],
+        fn make_move_opponent(ref world: IWorldDispatcher, session_id: felt252, hand: u8, target_hand: u8) {
+            let caller = get_caller_address();
+            let mut game = get!(world,session_id,(Game));
+            if game.state != GameState::InProgress {
+                panic("Game is not in progress");
+            }
+
+            let active_player = if game.current_turn == Turn::Player1 {
+                &mut game.player1
+            } else {
+                game.player2.as_mut().unwrap()
             };
 
-            set!(
-                world,
-                (
-                    Moves {
-                        player, remaining: 100, last_direction: Direction::None(()), can_move: true
-                    },
-                    Position {
-                        player, vec: Vec2 { x: position.vec.x + 10, y: position.vec.y + 10 }
-                    },
-                    directions_available
-                )
-            );
+            let opponent = if game.current_turn == Turn::Player1 {
+                game.player2.as_mut().unwrap()
+            } else {
+                &mut game.player1
+            };
+
+            let active_hand = if hand == 0 { active_player.left_hand } else { active_player.right_hand };
+            let opponent_hand = if target_hand == 0 { &mut opponent.left_hand } else { &mut opponent.right_hand };
+
+            *opponent_hand += active_hand;
+            if *opponent_hand >= 5 { *opponent_hand = 0; }
+
+            if opponent.left_hand == 0 && opponent.right_hand == 0 {
+                game.state = GameState::Finished(caller);
+            } else {
+                game.current_turn = if game.current_turn == Turn::Player1 {
+                    Turn::Player2
+                } else {
+                    Turn::Player1
+                };
+            }
+
+            set!(world,game);
+            world.emit(MoveMade { session_id, player_id: caller, move_type: 1 });
         }
 
-        // Implementation of the move function for the ContractState struct.
-        fn move(ref world: IWorldDispatcher, direction: Direction) {
-            // Get the address of the current caller, possibly the player's address.
-            let player = get_caller_address();
+        fn make_move_other_hand(ref world: IWorldDispatcher, session_id: felt252, current_hand: felt252, transfer: felt252) {
+            let caller = get_caller_address();
+            let mut game = get!(world,session_id,(Game));
+            if game.state != GameState::InProgress {
+                panic("Game is not in progress");
+            }
 
-            // Retrieve the player's current position and moves data from the world.
-            let (mut position, mut moves) = get!(world, player, (Position, Moves));
+            let active_player = if game.current_turn == Turn::Player1 {
+                &mut game.player1
+            } else {
+                game.player2.as_mut().unwrap()
+            };
 
-            // Deduct one from the player's remaining moves.
-            moves.remaining -= 1;
+            let left = &mut active_player.left_hand;
+            let right = &mut active_player.right_hand;
 
-            // Update the last direction the player moved in.
-            moves.last_direction = direction;
+            let active_hand;
+            let target_hand;
+            if current_hand == 0 {
+                active_hand = left;
+                target_hand = right;
+            } else {
+                active_hand = right;
+                target_hand = left;
+            }
 
-            // Calculate the player's next position based on the provided direction.
-            let next = next_position(position, direction);
+            if transfer > *active_hand {
+                panic("Cannot transfer more than the amount in your hand");
+            }
 
-            // Update the world state with the new moves data and position.
-            set!(world, (moves, next));
-            // Emit an event to the world to notify about the player's move.
-            emit!(world, (Moved { player, direction }));
+            let new_active_hand = *active_hand - transfer;
+            let new_target_hand = (*target_hand + transfer) % 5;
+
+            if new_active_hand == *target_hand && new_target_hand == *active_hand {
+                panic("Symmetric operations are not allowed");
+            }
+
+            *active_hand = new_active_hand;
+            *target_hand = new_target_hand;
+
+            set!(world,game);
+            world.emit(MoveMade { session_id, player_id: caller, move_type: 2 });
         }
     }
-}
-
-// Define function like this:
-fn next_position(mut position: Position, direction: Direction) -> Position {
-    match direction {
-        Direction::None => { return position; },
-        Direction::Left => { position.vec.x -= 1; },
-        Direction::Right => { position.vec.x += 1; },
-        Direction::Up => { position.vec.y -= 1; },
-        Direction::Down => { position.vec.y += 1; },
-    };
-    position
 }
